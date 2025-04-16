@@ -1,6 +1,8 @@
 import './App.css';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import CameraFeed from './CameraFeed';
+// import SimpleCameraFeed from './SimpleCameraFeed';
+// import CameraFeed from './CameraFeed';
+import StepByStepCameraFeed from './StepByStepCameraFeed';
 
 
 function App() {
@@ -131,9 +133,9 @@ function App() {
           <div className="move-display">
             <h2 className='move' id={`player${theme}`}>{move}</h2>
           </div>
-          <CameraFeed
-            onMoveDetected={setMove}
+          <StepByStepCameraFeed
             theme={theme}
+            onMoveDetected={setMove}
           />
         </div>
 

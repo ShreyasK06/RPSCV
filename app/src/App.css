@@ -145,6 +145,54 @@ video {
   z-index: 10;
 }
 
+/* Camera controls and status indicators */
+.camera-controls {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  z-index: 20;
+}
+
+.camera-status {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #00ff00;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.detection-status {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #ffcc00;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.enable-detection-btn {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.enable-detection-btn:hover {
+  background-color: #45a049;
+}
+
 
 
 #videolight { border-color: var(--border-light); }
