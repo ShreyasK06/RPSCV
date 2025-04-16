@@ -37,39 +37,68 @@ const CameraFeed = ({ onMoveDetected, theme }) => {
           audio: false
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log('Camera access granted');
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          console.log('Camera access granted');
 
-        // Check if component is still mounted
-        if (!isMounted || !videoRef.current) return;
-
-        // Set the video source
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
+          // Check if component is still mounted
           if (!isMounted || !videoRef.current) return;
-          videoRef.current.play()
-            .then(() => {
-              console.log('Video playback started');
-              // Set video element for hand detection
-              handDetection.setVideoElement(videoRef.current);
 
-              // Start hand detection
-              handDetection.startDetection((move, landmarks, boundingBox) => {
-                if (!isMounted) return;
-                // Update the parent component with the detected move
-                onMoveDetected(move);
+          // Set the video source
+          videoRef.current.srcObject = stream;
 
-                // Draw hand landmarks on canvas if available
-                if (landmarks && canvasRef.current) {
-                  drawHand(landmarks, boundingBox);
-                }
+          // Make sure canvas is properly sized
+          if (canvasRef.current) {
+            const videoTrack = stream.getVideoTracks()[0];
+            const settings = videoTrack.getSettings();
+            console.log('Video track settings:', settings);
+
+            // Set canvas dimensions to match video
+            canvasRef.current.width = settings.width || 640;
+            canvasRef.current.height = settings.height || 480;
+          }
+
+          // Wait for video to be ready
+          videoRef.current.onloadedmetadata = () => {
+            if (!isMounted || !videoRef.current) return;
+            console.log('Video metadata loaded, starting playback...');
+
+            videoRef.current.play()
+              .then(() => {
+                console.log('Video playback started');
+                // Set video element for hand detection
+                handDetection.setVideoElement(videoRef.current);
+
+                // Start hand detection
+                handDetection.startDetection((move, landmarks, boundingBox) => {
+                  if (!isMounted) return;
+                  // Update the parent component with the detected move
+                  onMoveDetected(move);
+
+                  // Draw hand landmarks on canvas if available
+                  if (landmarks && canvasRef.current) {
+                    drawHand(landmarks, boundingBox);
+                  }
+                });
+              })
+              .catch(err => {
+                console.error('Error playing video:', err);
+                if (isMounted) setCameraError(true);
               });
-            })
-            .catch(err => {
-              console.error('Error playing video:', err);
-              if (isMounted) setCameraError(true);
-            });
-        };
+          };
+
+          // Also handle the canplay event as a backup
+          videoRef.current.oncanplay = () => {
+            console.log('Video can play event fired');
+            if (videoRef.current && videoRef.current.paused) {
+              console.log('Video was paused, attempting to play again');
+              videoRef.current.play().catch(err => console.error('Error on canplay:', err));
+            }
+          };
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          if (isMounted) setCameraError(true);
+        }
 
         if (isMounted) setModelLoading(false);
       } catch (error) {
@@ -96,16 +125,28 @@ const CameraFeed = ({ onMoveDetected, theme }) => {
 
   // Draw hand landmarks on canvas
   const drawHand = (landmarks, boundingBox) => {
+    if (!canvasRef.current) return;
+
     const ctx = canvasRef.current.getContext('2d');
-    const { width, height } = canvasRef.current;
+    if (!ctx) return;
+
+    const width = canvasRef.current.width;
+    const height = canvasRef.current.height;
+
+    // Log canvas dimensions for debugging
+    console.log(`Drawing on canvas: ${width}x${height}`);
 
     // Clear the canvas
     ctx.clearRect(0, 0, width, height);
 
+    // Draw semi-transparent overlay to make landmarks more visible
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(0, 0, width, height);
+
     // Draw bounding box
     if (boundingBox) {
       ctx.strokeStyle = '#00FF00';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
 
       // Calculate bounding box with padding
       const padding = 20;
@@ -123,9 +164,14 @@ const CameraFeed = ({ onMoveDetected, theme }) => {
 
       // Draw point
       ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
+      ctx.arc(x, y, 6, 0, 2 * Math.PI);
       ctx.fillStyle = '#FF0000';
       ctx.fill();
+
+      // Add a white border to make points more visible
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
       // Connect points with lines
       if (i > 0 && i % 4 !== 0) {
@@ -134,15 +180,22 @@ const CameraFeed = ({ onMoveDetected, theme }) => {
         ctx.moveTo(prevX, prevY);
         ctx.lineTo(x, y);
         ctx.strokeStyle = '#FF0000';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.stroke();
       }
     }
 
-    // Draw move text
-    ctx.font = '24px Arial';
+    // Draw move text with better visibility
+    const move = handDetection.getCurrentMove();
+    ctx.font = 'bold 28px Arial';
+
+    // Draw text shadow for better visibility
+    ctx.fillStyle = '#000000';
+    ctx.fillText(`Move: ${move}`, 12, 32);
+
+    // Draw text
     ctx.fillStyle = '#00FF00';
-    ctx.fillText(`Move: ${handDetection.getCurrentMove()}`, 10, 30);
+    ctx.fillText(`Move: ${move}`, 10, 30);
   };
 
   return (
@@ -172,15 +225,27 @@ const CameraFeed = ({ onMoveDetected, theme }) => {
             autoPlay
             playsInline
             muted
-            width="400"
-            height="400"
-            style={{ objectFit: 'cover' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: '10px',
+              display: 'block'
+            }}
           />
           <canvas
             ref={canvasRef}
             className="hand-canvas"
-            width="400"
-            height="400"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: '10px',
+              pointerEvents: 'none'
+            }}
           />
         </div>
       )}

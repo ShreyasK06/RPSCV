@@ -115,24 +115,34 @@ body.dark .placeholder-content strong {
   position: relative;
   width: 100%;
   max-width: 400px;
+  height: 400px;
   margin: 0 auto;
+  border: 2px solid;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
 }
 
 .video-wrapper {
   position: relative;
   width: 100%;
   height: 100%;
+  background-color: #000;
 }
 
+/* Remove default video styling */
+video {
+  display: block;
+}
+
+/* Make sure canvas is properly positioned over video */
 .hand-canvas {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  border-radius: var(--border-radius);
-  pointer-events: none;
+  z-index: 10;
 }
 
 

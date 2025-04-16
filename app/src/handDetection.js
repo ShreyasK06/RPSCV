@@ -15,7 +15,15 @@ class HandDetection {
   async loadModel() {
     try {
       console.log("Loading handpose model...");
-      this.model = await handpose.load();
+      // Configure model with lower confidence threshold for better detection
+      const modelConfig = {
+        detectionConfidence: 0.5,
+        maxContinuousChecks: 5,
+        iouThreshold: 0.3,
+        scoreThreshold: 0.75
+      };
+
+      this.model = await handpose.load(modelConfig);
       this.isModelLoaded = true;
       console.log("Handpose model loaded successfully");
       return true;
@@ -81,14 +89,28 @@ class HandDetection {
     console.log("Starting hand detection...");
     let isRunning = true;
 
+    // Use a flag to prevent multiple concurrent detections
+    let isDetecting = false;
+
     const detectHands = async () => {
       if (!isRunning) return;
 
+      // Skip if already processing a frame
+      if (isDetecting) {
+        requestAnimationFrame(detectHands);
+        return;
+      }
+
       // Check if video is ready
-      if (this.videoElement.readyState === 4) {
+      if (this.videoElement && this.videoElement.readyState === 4) {
         try {
+          isDetecting = true;
+
           // Get hand predictions
           const predictions = await this.model.estimateHands(this.videoElement);
+
+          // Reset flag after detection
+          isDetecting = false;
 
           if (predictions && predictions.length > 0) {
             // Get landmarks from the first detected hand
@@ -99,28 +121,33 @@ class HandDetection {
             this.currentMove = move;
 
             // Call the callback with the detected move and landmarks
-            if (callback) {
+            if (callback && isRunning) {
               callback(move, landmarks, predictions[0].boundingBox);
             }
           } else {
             this.currentMove = "NONE";
-            if (callback) {
+            if (callback && isRunning) {
               callback("NONE", null, null);
             }
           }
         } catch (error) {
           console.error("Error during hand detection:", error);
+          // Reset flag on error
+          isDetecting = false;
+
           // Still call callback with NONE to ensure UI updates
-          if (callback) {
+          if (callback && isRunning) {
             callback("NONE", null, null);
           }
         }
-      } else {
+      } else if (this.videoElement) {
         console.log("Video not ready, readyState:", this.videoElement.readyState);
       }
 
-      // Continue detection loop
-      requestAnimationFrame(detectHands);
+      // Continue detection loop with a slight delay to reduce CPU usage
+      if (isRunning) {
+        setTimeout(() => requestAnimationFrame(detectHands), 100);
+      }
     };
 
     detectHands();
