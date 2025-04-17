@@ -116,10 +116,10 @@ body.dark .placeholder-content strong {
   width: 100%;
   max-width: 400px;
   height: 400px;
-  margin: 0 auto;
+  margin: 60px auto 0; /* Added top margin to make room for the text */
   border: 2px solid;
   border-radius: var(--border-radius);
-  overflow: hidden;
+  overflow: visible; /* Changed to visible so the text can appear above */
   box-shadow: var(--shadow);
 }
 
@@ -145,63 +145,41 @@ video {
   z-index: 10;
 }
 
-/* Minimal move indicator */
-.minimal-move-indicator {
+/* Text move indicator */
+.text-move-indicator {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: -50px; /* Position above the camera */
+  left: 0;
+  right: 0;
+  text-align: center;
   z-index: 20;
 }
 
-.move-badge {
-  font-size: 18px;
+.move-text {
+  display: inline-block;
+  font-size: 24px;
   font-weight: bold;
-  padding: 5px 10px;
-  border-radius: 20px;
+  padding: 5px 20px;
   text-transform: uppercase;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  opacity: 0.9;
-  transition: all 0.3s ease;
+  letter-spacing: 2px;
+  border-radius: 5px;
+  margin: 0 auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
-.move-badge.rock {
+.move-text.rock {
   background-color: #ff5555;
   color: white;
-  animation: pulse-rock 1.5s infinite;
 }
 
-.move-badge.paper {
+.move-text.paper {
   background-color: #55ff55;
   color: black;
-  animation: pulse-paper 1.5s infinite;
 }
 
-.move-badge.scissor {
+.move-text.scissor {
   background-color: #5555ff;
   color: white;
-  animation: pulse-scissor 1.5s infinite;
-}
-
-.move-badge.none {
-  display: none;
-}
-
-@keyframes pulse-rock {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-@keyframes pulse-paper {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-@keyframes pulse-scissor {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
 }
 
 
