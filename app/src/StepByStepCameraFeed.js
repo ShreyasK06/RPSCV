@@ -6,7 +6,7 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
   const canvasRef = useRef(null);
   const [cameraError, setCameraError] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [handDetectionEnabled, setHandDetectionEnabled] = useState(false);
+  const [handDetectionEnabled, setHandDetectionEnabled] = useState(true); // Auto-enable hand detection
   const [handDetectionReady, setHandDetectionReady] = useState(false);
   const [detectedMove, setDetectedMove] = useState('NONE');
 
@@ -145,7 +145,7 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
     };
   }, [handDetectionEnabled, cameraReady, onMoveDetected]);
 
-  // Draw hand landmarks on canvas
+  // Draw hand landmarks on canvas with a cleaner, more minimal style
   const drawHand = (landmarks, boundingBox) => {
     if (!canvasRef.current) return;
 
@@ -158,14 +158,21 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
     // Clear the canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Draw semi-transparent overlay to make landmarks more visible
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    ctx.fillRect(0, 0, width, height);
+    // Don't draw the semi-transparent overlay for a cleaner look
 
-    // Draw bounding box
+    // Draw a subtle bounding box
     if (boundingBox) {
-      ctx.strokeStyle = '#00FF00';
-      ctx.lineWidth = 3;
+      // Choose color based on detected move
+      let boxColor;
+      switch (detectedMove) {
+        case 'ROCK': boxColor = 'rgba(255, 85, 85, 0.7)'; break;
+        case 'PAPER': boxColor = 'rgba(85, 255, 85, 0.7)'; break;
+        case 'SCISSOR': boxColor = 'rgba(85, 85, 255, 0.7)'; break;
+        default: boxColor = 'rgba(255, 255, 255, 0.5)';
+      }
+
+      ctx.strokeStyle = boxColor;
+      ctx.lineWidth = 2;
 
       // Calculate bounding box with padding
       const padding = 20;
@@ -174,47 +181,41 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
       const boxWidth = (boundingBox.bottomRight[0] - boundingBox.topLeft[0]) + (padding * 2);
       const boxHeight = (boundingBox.bottomRight[1] - boundingBox.topLeft[1]) + (padding * 2);
 
-      ctx.strokeRect(x, y, boxWidth, boxHeight);
+      // Draw rounded rectangle
+      ctx.beginPath();
+      ctx.roundRect(x, y, boxWidth, boxHeight, 10);
+      ctx.stroke();
     }
 
-    // Draw landmarks
-    for (let i = 0; i < landmarks.length; i++) {
-      const [x, y] = landmarks[i];
-
-      // Draw point
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, 2 * Math.PI);
-      ctx.fillStyle = '#FF0000';
-      ctx.fill();
-
-      // Add a white border to make points more visible
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Connect points with lines
-      if (i > 0 && i % 4 !== 0) {
+    // Draw hand skeleton with a more subtle style
+    // First draw the connections (lines)
+    for (let i = 1; i < landmarks.length; i++) {
+      // Skip connections between different fingers
+      if (i % 4 !== 1) {
+        const [x, y] = landmarks[i];
         const [prevX, prevY] = landmarks[i - 1];
+
         ctx.beginPath();
         ctx.moveTo(prevX, prevY);
         ctx.lineTo(x, y);
-        ctx.strokeStyle = '#FF0000';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 2;
         ctx.stroke();
       }
     }
 
-    // Draw move text with better visibility
-    const move = detectedMove;
-    ctx.font = 'bold 28px Arial';
+    // Then draw the points (joints)
+    for (let i = 0; i < landmarks.length; i++) {
+      const [x, y] = landmarks[i];
 
-    // Draw text shadow for better visibility
-    ctx.fillStyle = '#000000';
-    ctx.fillText(`Move: ${move}`, 12, 32);
+      // Draw smaller points for a cleaner look
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.fill();
+    }
 
-    // Draw text
-    ctx.fillStyle = '#00FF00';
-    ctx.fillText(`Move: ${move}`, 10, 30);
+    // No text on the canvas for a cleaner look
   };
 
   return (
@@ -265,37 +266,14 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
             />
           )}
 
-          {/* Status indicators */}
-          <div className="camera-controls" style={{ transform: 'scaleX(-1)' }}>
-            {cameraReady && (
-              <div className="camera-status">
-                Camera is working! {videoRef.current?.videoWidth}x{videoRef.current?.videoHeight}
+          {/* Minimal move indicator */}
+          {handDetectionEnabled && handDetectionReady && (
+            <div className="minimal-move-indicator" style={{ transform: 'scaleX(-1)' }}>
+              <div className={`move-badge ${detectedMove.toLowerCase()}`}>
+                {detectedMove !== "NONE" ? detectedMove : ""}
               </div>
-            )}
-
-            {cameraReady && !handDetectionEnabled && (
-              <button
-                className="enable-detection-btn"
-                onClick={() => setHandDetectionEnabled(true)}
-              >
-                Enable Hand Detection
-              </button>
-            )}
-
-            {handDetectionEnabled && handDetectionReady && (
-              <div className="detection-status">
-                <div>Hand detection active</div>
-                <div className={`move-indicator ${detectedMove.toLowerCase()}`}>
-                  Detected move: <strong>{detectedMove}</strong>
-                </div>
-                <div className="detection-tip">
-                  {detectedMove === "NONE" ?
-                    "Show your hand clearly to the camera" :
-                    `${detectedMove} detected! Try making other gestures.`}
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
