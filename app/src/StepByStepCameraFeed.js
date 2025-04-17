@@ -14,44 +14,44 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
   useEffect(() => {
     let isMounted = true;
     const videoElement = videoRef.current;
-    
+
     const setupCamera = async () => {
       try {
         console.log('Requesting camera access...');
         const constraints = {
-          video: { 
+          video: {
             width: { ideal: 640 },
             height: { ideal: 480 },
             facingMode: 'user'
           },
           audio: false
         };
-        
+
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log('Camera access granted');
-        
+
         // Check if component is still mounted
         if (!isMounted || !videoRef.current) return;
-        
+
         // Set the video source
         videoRef.current.srcObject = stream;
-        
+
         // Make sure canvas is properly sized
         if (canvasRef.current) {
           const videoTrack = stream.getVideoTracks()[0];
           const settings = videoTrack.getSettings();
           console.log('Video track settings:', settings);
-          
+
           // Set canvas dimensions to match video
           canvasRef.current.width = settings.width || 640;
           canvasRef.current.height = settings.height || 480;
         }
-        
+
         // Wait for video to be ready
         videoRef.current.onloadedmetadata = () => {
           if (!isMounted || !videoRef.current) return;
           console.log('Video metadata loaded, starting playback...');
-          
+
           videoRef.current.play()
             .then(() => {
               console.log('Video playback started');
@@ -62,7 +62,7 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
               if (isMounted) setCameraError(true);
             });
         };
-        
+
         // Also handle the canplay event as a backup
         videoRef.current.oncanplay = () => {
           console.log('Video can play event fired');
@@ -77,9 +77,9 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
         if (isMounted) setCameraError(true);
       }
     };
-    
+
     setupCamera();
-    
+
     // Cleanup function
     return () => {
       isMounted = false;
@@ -98,47 +98,47 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
 
     const setupHandDetection = async () => {
       if (!handDetectionEnabled || !cameraReady || !videoRef.current) return;
-      
+
       try {
         console.log('Initializing hand detection...');
         const modelLoaded = await handDetection.loadModel();
         if (!modelLoaded) {
           throw new Error("Failed to load handpose model");
         }
-        
+
         if (!isMounted) return;
         console.log('Hand detection model loaded successfully');
-        
+
         // Set video element for hand detection
         handDetection.setVideoElement(videoRef.current);
-        
+
         // Start hand detection
         stopDetection = handDetection.startDetection((move, landmarks, boundingBox) => {
           if (!isMounted) return;
-          
+
           // Update the detected move
           setDetectedMove(move);
-          
+
           // Call the parent callback
           if (onMoveDetected) {
             onMoveDetected(move);
           }
-          
+
           // Draw hand landmarks on canvas if available
           if (landmarks && canvasRef.current) {
             drawHand(landmarks, boundingBox);
           }
         });
-        
+
         setHandDetectionReady(true);
       } catch (error) {
         console.error('Error setting up hand detection:', error);
         if (isMounted) setHandDetectionReady(false);
       }
     };
-    
+
     setupHandDetection();
-    
+
     return () => {
       isMounted = false;
       if (stopDetection) stopDetection();
@@ -148,50 +148,50 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
   // Draw hand landmarks on canvas
   const drawHand = (landmarks, boundingBox) => {
     if (!canvasRef.current) return;
-    
+
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
-    
+
     const width = canvasRef.current.width;
     const height = canvasRef.current.height;
-    
+
     // Clear the canvas
     ctx.clearRect(0, 0, width, height);
-    
+
     // Draw semi-transparent overlay to make landmarks more visible
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.fillRect(0, 0, width, height);
-    
+
     // Draw bounding box
     if (boundingBox) {
       ctx.strokeStyle = '#00FF00';
       ctx.lineWidth = 3;
-      
+
       // Calculate bounding box with padding
       const padding = 20;
       const x = boundingBox.topLeft[0] - padding;
       const y = boundingBox.topLeft[1] - padding;
       const boxWidth = (boundingBox.bottomRight[0] - boundingBox.topLeft[0]) + (padding * 2);
       const boxHeight = (boundingBox.bottomRight[1] - boundingBox.topLeft[1]) + (padding * 2);
-      
+
       ctx.strokeRect(x, y, boxWidth, boxHeight);
     }
-    
+
     // Draw landmarks
     for (let i = 0; i < landmarks.length; i++) {
       const [x, y] = landmarks[i];
-      
+
       // Draw point
       ctx.beginPath();
       ctx.arc(x, y, 6, 0, 2 * Math.PI);
       ctx.fillStyle = '#FF0000';
       ctx.fill();
-      
+
       // Add a white border to make points more visible
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 2;
       ctx.stroke();
-      
+
       // Connect points with lines
       if (i > 0 && i % 4 !== 0) {
         const [prevX, prevY] = landmarks[i - 1];
@@ -203,15 +203,15 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
         ctx.stroke();
       }
     }
-    
+
     // Draw move text with better visibility
     const move = detectedMove;
     ctx.font = 'bold 28px Arial';
-    
+
     // Draw text shadow for better visibility
     ctx.fillStyle = '#000000';
     ctx.fillText(`Move: ${move}`, 12, 32);
-    
+
     // Draw text
     ctx.fillStyle = '#00FF00';
     ctx.fillText(`Move: ${move}`, 10, 30);
@@ -245,7 +245,7 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
               transform: 'scaleX(-1)' // This flips the video horizontally
             }}
           />
-          
+
           {/* Canvas overlay for hand detection */}
           {handDetectionEnabled && (
             <canvas
@@ -264,7 +264,7 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
               }}
             />
           )}
-          
+
           {/* Status indicators */}
           <div className="camera-controls" style={{ transform: 'scaleX(-1)' }}>
             {cameraReady && (
@@ -272,19 +272,27 @@ const StepByStepCameraFeed = ({ onMoveDetected, theme }) => {
                 Camera is working! {videoRef.current?.videoWidth}x{videoRef.current?.videoHeight}
               </div>
             )}
-            
+
             {cameraReady && !handDetectionEnabled && (
-              <button 
+              <button
                 className="enable-detection-btn"
                 onClick={() => setHandDetectionEnabled(true)}
               >
                 Enable Hand Detection
               </button>
             )}
-            
+
             {handDetectionEnabled && handDetectionReady && (
               <div className="detection-status">
-                Hand detection active. Detected move: {detectedMove}
+                <div>Hand detection active</div>
+                <div className={`move-indicator ${detectedMove.toLowerCase()}`}>
+                  Detected move: <strong>{detectedMove}</strong>
+                </div>
+                <div className="detection-tip">
+                  {detectedMove === "NONE" ?
+                    "Show your hand clearly to the camera" :
+                    `${detectedMove} detected! Try making other gestures.`}
+                </div>
               </div>
             )}
           </div>

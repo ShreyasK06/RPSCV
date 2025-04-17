@@ -10,6 +10,11 @@ class HandDetection {
     this.isModelLoaded = false;
     this.marginS = 0.075; // Same as Python margin_s
     this.marginP = 0.1;   // Same as Python margin_p
+
+    // Gesture stabilization
+    this.moveHistory = [];
+    this.historySize = 10; // Number of frames to consider for stabilization
+    this.confidenceThreshold = 0.6; // Minimum confidence to change gesture
   }
 
   async loadModel() {
@@ -37,7 +42,7 @@ class HandDetection {
     this.videoElement = videoElement;
   }
 
-  // Detect moves based on hand landmarks (similar to Python detectMoves function)
+  // Detect moves based on hand landmarks
   detectMoves(landmarks) {
     if (!landmarks || landmarks.length === 0) return "NONE";
 
@@ -48,29 +53,51 @@ class HandDetection {
       z: point[2]
     }));
 
-    // Check for rock gesture (thumb is tucked)
-    const rock = hl[6].y > hl[4].y;
+    // Log the landmarks for debugging
+    console.log('Hand landmarks detected');
 
-    // Check for scissors gesture (index and middle finger extended)
-    const scissor =
-      Math.abs(hl[4].x - hl[16].x) < this.marginS &&
-      Math.abs(hl[4].x - hl[20].x) < this.marginS &&
-      Math.abs(hl[16].x - hl[20].x) < this.marginS;
+    // Calculate finger states (extended or not)
+    // Thumb
+    const thumbExtended = hl[4].x > hl[3].x + 20; // For right hand
 
-    // Check for paper gesture (all fingers extended)
-    const paper =
-      Math.abs(hl[6].y - hl[10].y) < this.marginP &&
-      Math.abs(hl[6].y - hl[14].y) < this.marginP &&
-      Math.abs(hl[6].y - hl[19].y) < this.marginP &&
-      Math.abs(hl[10].y - hl[14].y) < this.marginP &&
-      Math.abs(hl[10].y - hl[19].y) < this.marginP &&
-      Math.abs(hl[14].y - hl[19].y) < this.marginP &&
-      hl[4].y < hl[5].y + this.marginS &&
-      hl[4].y > hl[6].y + this.marginS;
+    // Index finger
+    const indexExtended = hl[8].y < hl[6].y;
 
-    if (rock) return "ROCK";
-    if (scissor) return "SCISSOR";
-    if (paper) return "PAPER";
+    // Middle finger
+    const middleExtended = hl[12].y < hl[10].y;
+
+    // Ring finger
+    const ringExtended = hl[16].y < hl[14].y;
+
+    // Pinky finger
+    const pinkyExtended = hl[20].y < hl[18].y;
+
+    // Log finger states for debugging
+    console.log('Finger states:', {
+      thumbExtended,
+      indexExtended,
+      middleExtended,
+      ringExtended,
+      pinkyExtended
+    });
+
+    // ROCK: All fingers are curled except maybe the thumb
+    const isRock = !indexExtended && !middleExtended && !ringExtended && !pinkyExtended;
+
+    // PAPER: All fingers are extended
+    const isPaper = indexExtended && middleExtended && ringExtended && pinkyExtended;
+
+    // SCISSORS: Index and middle fingers extended, others curled
+    const isScissors = indexExtended && middleExtended && !ringExtended && !pinkyExtended;
+
+    // Log detected gestures
+    console.log('Detected gestures:', { isRock, isPaper, isScissors });
+
+    // Return the detected move with priority (if multiple gestures are detected)
+    if (isRock) return "ROCK";
+    if (isScissors) return "SCISSOR";
+    if (isPaper) return "PAPER";
+
     return "NONE";
   }
 
@@ -116,18 +143,21 @@ class HandDetection {
             // Get landmarks from the first detected hand
             const landmarks = predictions[0].landmarks;
 
-            // Detect the move
-            const move = this.detectMoves(landmarks);
-            this.currentMove = move;
+            // Detect the raw move
+            const rawMove = this.detectMoves(landmarks);
 
-            // Call the callback with the detected move and landmarks
+            // Stabilize the move
+            const stableMove = this.stabilizeMove(rawMove);
+
+            // Call the callback with the stabilized move and landmarks
             if (callback && isRunning) {
-              callback(move, landmarks, predictions[0].boundingBox);
+              callback(stableMove, landmarks, predictions[0].boundingBox);
             }
           } else {
-            this.currentMove = "NONE";
+            // Stabilize with "NONE" when no hand is detected
+            const stableMove = this.stabilizeMove("NONE");
             if (callback && isRunning) {
-              callback("NONE", null, null);
+              callback(stableMove, null, null);
             }
           }
         } catch (error) {
@@ -135,9 +165,10 @@ class HandDetection {
           // Reset flag on error
           isDetecting = false;
 
-          // Still call callback with NONE to ensure UI updates
+          // Still call callback with stabilized NONE to ensure UI updates
           if (callback && isRunning) {
-            callback("NONE", null, null);
+            const stableMove = this.stabilizeMove("NONE");
+            callback(stableMove, null, null);
           }
         }
       } else if (this.videoElement) {
@@ -156,6 +187,46 @@ class HandDetection {
     return () => {
       isRunning = false;
     };
+  }
+
+  // Stabilize the detected move using a history of recent detections
+  stabilizeMove(move) {
+    // Add the new move to history
+    this.moveHistory.push(move);
+
+    // Keep only the most recent moves
+    if (this.moveHistory.length > this.historySize) {
+      this.moveHistory.shift();
+    }
+
+    // Count occurrences of each move in history
+    const moveCounts = {};
+    this.moveHistory.forEach(m => {
+      moveCounts[m] = (moveCounts[m] || 0) + 1;
+    });
+
+    // Find the most frequent move
+    let maxCount = 0;
+    let stableMove = "NONE";
+
+    for (const [m, count] of Object.entries(moveCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        stableMove = m;
+      }
+    }
+
+    // Calculate confidence (percentage of frames with this move)
+    const confidence = maxCount / this.moveHistory.length;
+
+    // Only change the current move if confidence is high enough
+    if (confidence >= this.confidenceThreshold || this.currentMove === "NONE") {
+      this.currentMove = stableMove;
+    }
+
+    console.log(`Move: ${move}, Stable: ${this.currentMove}, Confidence: ${confidence.toFixed(2)}`);
+
+    return this.currentMove;
   }
 
   // Get the current detected move
